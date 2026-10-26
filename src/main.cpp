@@ -8,7 +8,7 @@ int main() {
     KeyValueStore store;
     string command;
 
-    cout << "Mini Redis - Phase 2" << endl;
+    cout << "Mini Redis - Phase 3" << endl;
     cout << "Commands: SET key value | GET key | DEL key | EXIT" << endl;
 
     while (true) {
