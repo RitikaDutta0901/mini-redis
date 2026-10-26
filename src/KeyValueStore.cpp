@@ -3,7 +3,12 @@
 
 using namespace std;
 
-KeyValueStore::KeyValueStore(const string &wal_file) {
+KeyValueStore::KeyValueStore(size_t max_capacity, const string &wal_file)
+    : capacity(max_capacity) {
+    if (capacity == 0) {
+        capacity = 1;
+    }
+
     ifstream log(wal_file);
     string line;
 
@@ -16,11 +21,29 @@ KeyValueStore::KeyValueStore(const string &wal_file) {
             string key, value;
             getline(input, key, '\t');
             getline(input, value);
-            store[key] = value;
+
+            auto it = store.find(key);
+            if (it != store.end()) {
+                it->second.value = value;
+                lru.splice(lru.begin(), lru, it->second.position);
+            } else {
+                if (store.size() >= capacity) {
+                    string old_key = lru.back();
+                    lru.pop_back();
+                    store.erase(old_key);
+                }
+                lru.push_front(key);
+                store[key] = Entry{value, lru.begin()};
+            }
         } else if (operation == "DEL") {
             string key;
             getline(input, key, '\t');
-            store.erase(key);
+
+            auto it = store.find(key);
+            if (it != store.end()) {
+                lru.erase(it->second.position);
+                store.erase(it);
+            }
         }
     }
 
@@ -30,29 +53,51 @@ KeyValueStore::KeyValueStore(const string &wal_file) {
 
 void KeyValueStore::set(const string &key, const string &value) {
     unique_lock<shared_mutex> lock(rw_mutex);
-    store[key] = value;
+
+    auto it = store.find(key);
+    if (it != store.end()) {
+        it->second.value = value;
+        lru.splice(lru.begin(), lru, it->second.position);
+    } else {
+        if (store.size() >= capacity) {
+            string old_key = lru.back();
+            lru.pop_back();
+            store.erase(old_key);
+            wal << "DEL\t" << old_key << '\n';
+        }
+
+        lru.push_front(key);
+        store[key] = Entry{value, lru.begin()};
+    }
+
     wal << "SET\t" << key << '\t' << value << '\n';
     wal.flush();
 }
 
 bool KeyValueStore::get(const string &key, string &value) const {
-    shared_lock<shared_mutex> lock(rw_mutex);
+    unique_lock<shared_mutex> lock(rw_mutex);
+
     auto it = store.find(key);
     if (it == store.end()) {
         return false;
     }
-    value = it->second;
+
+    value = it->second.value;
+    lru.splice(lru.begin(), lru, it->second.position);
     return true;
 }
 
 bool KeyValueStore::remove(const string &key) {
     unique_lock<shared_mutex> lock(rw_mutex);
-    bool removed = store.erase(key) > 0;
 
-    if (removed) {
-        wal << "DEL\t" << key << '\n';
-        wal.flush();
+    auto it = store.find(key);
+    if (it == store.end()) {
+        return false;
     }
 
-    return removed;
+    lru.erase(it->second.position);
+    store.erase(it);
+    wal << "DEL\t" << key << '\n';
+    wal.flush();
+    return true;
 }

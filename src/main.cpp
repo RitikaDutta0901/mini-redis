@@ -4,11 +4,18 @@
 
 using namespace std;
 
-int main() {
-    KeyValueStore store;
+int main(int argc, char *argv[]) {
+    size_t capacity = 100;
+
+    if (argc > 1) {
+        capacity = stoi(argv[1]);
+    }
+
+    KeyValueStore store(capacity);
     string command;
 
-    cout << "Mini Redis - Phase 3" << endl;
+    cout << "Mini Redis - Phase 4" << endl;
+    cout << "Capacity: " << capacity << endl;
     cout << "Commands: SET key value | GET key | DEL key | EXIT" << endl;
 
     while (true) {
