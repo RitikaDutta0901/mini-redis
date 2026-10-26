@@ -1,0 +1,4 @@
+mini_redis
+*.o
+*.log
+*.aof
