@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra -Iinclude
+CXXFLAGS = -std=c++17 -Wall -Wextra -pthread -Iinclude
 TARGET = mini_redis
 SOURCES = src/main.cpp src/KeyValueStore.cpp
 HEADERS = include/KeyValueStore.h
